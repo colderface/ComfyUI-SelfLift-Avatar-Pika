@@ -1,4 +1,13 @@
 {
+  "fork_of": {
+    "repository": "https://github.com/slmonker/selflift-Avatar",
+    "fork_commit": "8fec8ca",
+    "fork_commit_subject": "Fix 1124 loop latent grid alignment",
+    "fork_commit_date": "2026-11-24",
+    "maintained_at": "https://github.com/colderface/ComfyUI-SelfLift-Avatar-Pika",
+    "local_changes": "LCM transition support (progressive_sample lcm_mode + SelfLiftAvatarPikaLcmH3Sampler); all sampler/TST node IDs prefixed SelfLiftAvatarPika* to coexist with the packaged v0.1.4-experimental release",
+    "upstream_notice": "NOTICE.md kept unchanged; fork-specific section appended"
+  },
   "upstream": "https://github.com/facok/comfyui-SelfLift",
   "basis": "Local installed snapshot; upstream commit not recorded.",
   "upstream_sha256": {

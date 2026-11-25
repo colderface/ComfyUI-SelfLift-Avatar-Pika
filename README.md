@@ -1,4 +1,24 @@
-# selflift-Avatar
+# ComfyUI-SelfLift-Avatar-Pika
+
+> **Fork note / 本仓库说明.** Fork of [slmonker/selflift-Avatar](https://github.com/slmonker/selflift-Avatar)
+> at `8fec8ca` (2026-11-24), maintained at
+> [colderface/ComfyUI-SelfLift-Avatar-Pika](https://github.com/colderface/ComfyUI-SelfLift-Avatar-Pika).
+> Two local changes only:
+> 1. **LCM support** — `progressive_sample(..., lcm_mode=...)` drives the resolution
+>    transition with LCM semantics (fresh re-noise at the next sigma instead of
+>    completing the Euler interval, audio streams pinned to the same boundary).
+>    Exposed as the separate node **`SelfLiftAvatarPikaLcmH3Sampler`**; the Euler
+>    node keeps upstream behaviour. Passing the lcm sampler into the Euler node,
+>    or the Euler sampler into the LCM node, is rejected on purpose — the two
+>    transition boundaries are not interchangeable.
+> 2. **Node ID prefix** — all sampler/TST nodes are registered as
+>    `SelfLiftAvatarPika*` so this plugin can be installed next to the packaged
+>    `v0.1.4-experimental` release (which registers the unprefixed names).
+>    The four long-video helper nodes (`H3LatentGridSnap`, `H3LatentTailPin`,
+>    `H3SeamColorAlign`, `H3SeamFrameCover`) keep their upstream names.
+>
+> See [NOTICE.md](NOTICE.md) for the upstream notices, kept unchanged, plus the
+> fork-specific section. No license is declared upstream or here.
 
 **Development: `main` (global-context memory saving + long-clip upscaler fix)** · **Packaged release: `v0.1.4-experimental`** · [中文说明](README_CN.md) · [Changelog](CHANGELOG.md) · [v0.1.4 release](https://github.com/slmonker/selflift-Avatar/releases/tag/v0.1.4-experimental)
 

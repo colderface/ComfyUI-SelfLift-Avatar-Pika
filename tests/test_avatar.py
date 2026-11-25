@@ -239,12 +239,12 @@ class MaskTests(unittest.TestCase):
         self.assertEqual(out.shape, self.v.shape)
         self.assertTrue(torch.isfinite(out).all())
     def test_unique_registration(self):
-        core={'SelfLiftAvatarH3Sampler','SelfLiftAvatarH3SpatialAnchoredSampler','SelfLiftAvatarImageSampler','SelfLiftAvatarH3TST'}
+        core={'SelfLiftAvatarPikaH3Sampler','SelfLiftAvatarPikaLcmH3Sampler','SelfLiftAvatarPikaH3SpatialAnchoredSampler','SelfLiftAvatarPikaImageSampler','SelfLiftAvatarPikaH3TST'}
         long_video={'H3LatentGridSnap','H3LatentTailPin','H3SeamColorAlign','H3SeamFrameCover'}
         self.assertEqual(set(plugin.NODE_CLASS_MAPPINGS), core | long_video)
         for name in core:
             cls=plugin.NODE_CLASS_MAPPINGS[name]
-            self.assertEqual(cls.CATEGORY, 'selflift-Avatar')
+            self.assertIn(cls.CATEGORY, ('selflift-Avatar', 'selflift-Avatar-Pika'))
             model_input = 'model' if cls is nodes.SelfLiftAvatarH3TST else 'low_res_model'
             self.assertIn(model_input, cls.INPUT_TYPES()['required'])
         self.assertEqual(plugin.NODE_CLASS_MAPPINGS['H3LatentTailPin'].CATEGORY, 'selflift-Avatar/latent')

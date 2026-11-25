@@ -122,8 +122,10 @@ def _pack(streams, nested):
 def _validate_sampling(model_sampling, sampler):
     if not isinstance(model_sampling, comfy.model_sampling.CONST):
         raise ValueError("SelfLift requires a rectified-flow model")
-    if not isinstance(sampler, comfy.samplers.KSAMPLER) or sampler.sampler_function is not comfy.k_diffusion.sampling.sample_euler:
-        raise ValueError("SelfLift requires the standard Euler sampler")
+    if not isinstance(sampler, comfy.samplers.KSAMPLER) or sampler.sampler_function not in (
+            comfy.k_diffusion.sampling.sample_euler,
+            comfy.k_diffusion.sampling.sample_lcm):
+        raise ValueError("SelfLift requires the standard Euler or LCM sampler")
     if sampler.extra_options.get("s_churn", 0.0) != 0.0:
         raise ValueError("SelfLift requires Euler with s_churn=0")
 
@@ -221,7 +223,7 @@ def progressive_sample(low_res_model, positive, negative, vae, latent_image, sam
                        tiling_axis="auto", on_tiling_plan=None,
                        highres_tiling_mode="spatial", highres_token_chunk=4096,
                        highres_weight_cache_gb=4.0, spatial_anchor_mode="off",
-                       tiling_overlap=None, diagnostics_out=None):
+                       tiling_overlap=None, diagnostics_out=None, lcm_mode=False):
     _validate_schedule(sigmas, transition_step)
     if sigmas.numel() < 2:
         return latent_image
@@ -271,6 +273,14 @@ def progressive_sample(low_res_model, positive, negative, vae, latent_image, sam
     model = low_res_model
     model_sampling = model.get_model_object("model_sampling")
     _validate_sampling(model_sampling, sampler)
+    if lcm_mode and sampler.sampler_function is not comfy.k_diffusion.sampling.sample_lcm:
+        raise ValueError("selflift-Avatar-Pika LCM mode requires KSamplerSelect set to lcm")
+    if not lcm_mode and sampler.sampler_function is comfy.k_diffusion.sampling.sample_lcm:
+        raise ValueError(
+            "selflift-Avatar-Pika: the lcm sampler must be used with the LCM sampler node "
+            "(SelfLiftAvatarPikaLcmH3Sampler); the Euler node would drive it through the wrong "
+            "transition boundary"
+        )
 
     streams, nested = _streams(comfy.sample.fix_empty_latent_channels(
         model, latent_image["samples"], latent_image.get("downscale_ratio_spacial", None),
@@ -406,8 +416,19 @@ def progressive_sample(low_res_model, positive, negative, vae, latent_image, sam
     x0_streams, _ = _streams(transition.pop("x0"))
     sigma_k = sigmas[transition_step - 1]
     sigma_next = sigmas[transition_step]
-    auxiliary_next = [_euler_step(state.to(device), denoised.to(device), sigma_k, sigma_next)
-                      for state, denoised in zip(low_streams[1:], x0_streams[1:])]
+    if lcm_mode:
+        # LCM's final step discards the current state after the x0 prediction and
+        # injects fresh noise at the next sigma instead of completing an Euler
+        # interval. Keep the auxiliary (audio) streams on that same boundary so
+        # the high-resolution stage resumes video and audio at one sigma.
+        auxiliary_next = []
+        for index, denoised in enumerate(x0_streams[1:]):
+            noise = comfy.sample.prepare_noise(denoised, (seed + 1000 + index) % (1 << 64),
+                                               latent_image.get("batch_index", None)).to(device)
+            auxiliary_next.append(model_sampling.noise_scaling(sigma_next, noise, denoised.to(device)))
+    else:
+        auxiliary_next = [_euler_step(state.to(device), denoised.to(device), sigma_k, sigma_next)
+                          for state, denoised in zip(low_streams[1:], x0_streams[1:])]
     latent_format = model.get_model_object("latent_format")
     z0_low_vae = latent_format.process_out(x0_streams[0].float()).to(device)
     # Keep the aligned low-resolution endpoint as an optional global H3
@@ -454,12 +475,17 @@ def progressive_sample(low_res_model, positive, negative, vae, latent_image, sam
     log_memory("transition correction_ready", model.load_device)
 
     # Re-noise the corrected video/image endpoint at the sigma of the reused model
-    # evaluation, then complete that Euler interval without another denoiser call.
+    # evaluation. Euler completes that interval without another denoiser call; LCM
+    # discards the state and restarts the next interval from fresh noise at sigma_next.
     video_noise = comfy.sample.prepare_noise(z0_high, (seed + 1) % (1 << 64),
                                              latent_image.get("batch_index", None)).to(z0_high)
-    video_state = model_sampling.noise_scaling(sigma_k, video_noise, z0_high)
-    next_streams = [_euler_step(video_state, z0_high, sigma_k, sigma_next)] + auxiliary_next
-    del z0_high, video_noise, video_state, auxiliary_next
+    if lcm_mode:
+        next_streams = [model_sampling.noise_scaling(sigma_next, video_noise, z0_high)] + auxiliary_next
+        del z0_high, video_noise, auxiliary_next
+    else:
+        video_state = model_sampling.noise_scaling(sigma_k, video_noise, z0_high)
+        next_streams = [_euler_step(video_state, z0_high, sigma_k, sigma_next)] + auxiliary_next
+        del z0_high, video_noise, video_state, auxiliary_next
     resume_streams = [model_sampling.inverse_noise_scaling(sigma_next, s) for s in next_streams]
     resume_latent = model.model.process_latent_out(_pack(resume_streams, nested))
     resume_noise = _pack([torch.zeros_like(s) for s in resume_streams], nested)
@@ -526,6 +552,9 @@ def progressive_sample(low_res_model, positive, negative, vae, latent_image, sam
 
 
 class SelfLiftAvatarH3Sampler:
+    # Subclasses flip this to drive the transition boundary with LCM semantics.
+    LCM_MODE = False
+
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
@@ -612,7 +641,8 @@ class SelfLiftAvatarH3Sampler:
                                         highres_weight_cache_gb=highres_weight_cache_gb,
                                         spatial_anchor_mode=spatial_anchor_mode,
                                         tiling_overlap=spatial_overlap,
-                                        diagnostics_out=diagnostics)
+                                        diagnostics_out=diagnostics,
+                                        lcm_mode=self.LCM_MODE)
         except Exception:
             send_status("FAILED / 运行失败：以下不是成功结果；详见错误报告\n" + summary)
             raise
@@ -628,6 +658,29 @@ class SelfLiftAvatarH3Sampler:
         if diagnostics:
             ui["selflift_seam_diag"] = [diagnostics]
         return {"ui": ui, "result": (output,)}
+
+
+class SelfLiftAvatarPikaLcmH3Sampler(SelfLiftAvatarH3Sampler):
+    """LCM variant of the Avatar sampler.
+
+    Identical to SelfLiftAvatarH3Sampler except for the resolution transition:
+    the Euler interval that follows the corrected high-resolution endpoint is
+    replaced by a direct re-noise at the next sigma, and the auxiliary audio
+    streams are pinned to that same boundary. This is the behaviour the H3 LCM
+    recipes need (low cfg, 3+3 or 4+2 step splits).
+    """
+
+    LCM_MODE = True
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        types = super().INPUT_TYPES()
+        types["required"]["sampler"] = ("SAMPLER", {"tooltip": "Connect KSamplerSelect set to lcm. This node uses LCM transition semantics; the Euler sampler is rejected."})
+        return types
+
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "sample"
+    CATEGORY = "selflift-Avatar-Pika"
 
 
 class SelfLiftAvatarH3SpatialAnchoredSampler(SelfLiftAvatarH3Sampler):
@@ -815,17 +868,19 @@ class SelfLiftAvatarH3TST:
 
 
 NODE_CLASS_MAPPINGS = {
-    "SelfLiftAvatarH3Sampler": SelfLiftAvatarH3Sampler,
-    "SelfLiftAvatarH3SpatialAnchoredSampler": SelfLiftAvatarH3SpatialAnchoredSampler,
-    "SelfLiftAvatarImageSampler": SelfLiftAvatarImageSampler,
-    "SelfLiftAvatarH3TST": SelfLiftAvatarH3TST,
+    "SelfLiftAvatarPikaH3Sampler": SelfLiftAvatarH3Sampler,
+    "SelfLiftAvatarPikaLcmH3Sampler": SelfLiftAvatarPikaLcmH3Sampler,
+    "SelfLiftAvatarPikaH3SpatialAnchoredSampler": SelfLiftAvatarH3SpatialAnchoredSampler,
+    "SelfLiftAvatarPikaImageSampler": SelfLiftAvatarImageSampler,
+    "SelfLiftAvatarPikaH3TST": SelfLiftAvatarH3TST,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "SelfLiftAvatarH3Sampler": "selflift-Avatar Sampler (MiniMax H3)",
-    "SelfLiftAvatarH3SpatialAnchoredSampler": "selflift-Avatar Spatial Anchor (TEST)",
-    "SelfLiftAvatarImageSampler": "selflift-Avatar Sampler (Image)",
-    "SelfLiftAvatarH3TST": "selflift-Avatar H3 TST",
+    "SelfLiftAvatarPikaH3Sampler": "selflift-Avatar-Pika Sampler (Euler)",
+    "SelfLiftAvatarPikaLcmH3Sampler": "selflift-Avatar-Pika Sampler (LCM)",
+    "SelfLiftAvatarPikaH3SpatialAnchoredSampler": "selflift-Avatar-Pika Spatial Anchor (TEST)",
+    "SelfLiftAvatarPikaImageSampler": "selflift-Avatar-Pika Sampler (Image)",
+    "SelfLiftAvatarPikaH3TST": "selflift-Avatar-Pika H3 TST",
 }
 
 # Long-video support bundled with selflift-Avatar.
