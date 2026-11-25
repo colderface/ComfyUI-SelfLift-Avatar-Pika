@@ -3307,7 +3307,7 @@
     },
     {
       "id": 112,
-      "type": "H3LatentTailPin",
+      "type": "SelfLiftAvatarPikaLatentTailPin",
       "pos": [
         1773,
         1806.07584665899
@@ -3368,7 +3368,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "H3LatentTailPin"
+        "Node name for S&R": "SelfLiftAvatarPikaLatentTailPin"
       },
       "widgets_values": [
         "22",
@@ -3461,7 +3461,7 @@
     },
     {
       "id": 115,
-      "type": "H3SeamColorAlign",
+      "type": "SelfLiftAvatarPikaSeamColorAlign",
       "pos": [
         3312.187675451034,
         830.619034664858
@@ -3510,7 +3510,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "H3SeamColorAlign"
+        "Node name for S&R": "SelfLiftAvatarPikaSeamColorAlign"
       },
       "widgets_values": [
         36,
@@ -3532,7 +3532,7 @@
     },
     {
       "id": 116,
-      "type": "H3SeamFrameCover",
+      "type": "SelfLiftAvatarPikaSeamFrameCover",
       "pos": [
         3321.015602191366,
         1115.2170333964452
@@ -3575,7 +3575,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "H3SeamFrameCover"
+        "Node name for S&R": "SelfLiftAvatarPikaSeamFrameCover"
       },
       "widgets_values": [
         1,
@@ -3593,7 +3593,7 @@
     },
     {
       "id": 117,
-      "type": "H3LatentGridSnap",
+      "type": "SelfLiftAvatarPikaLatentGridSnap",
       "title": "H3 Latent Grid Snap",
       "pos": [
         1309.6388177660465,
@@ -3629,7 +3629,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "H3LatentGridSnap"
+        "Node name for S&R": "SelfLiftAvatarPikaLatentGridSnap"
       },
       "widgets_values": []
     }
@@ -4583,9 +4583,9 @@
     "selflift_avatar_integrated_nodes": {
       "package": "selflift-Avatar",
       "types": [
-        "H3LatentTailPin",
-        "H3SeamColorAlign",
-        "H3SeamFrameCover"
+        "SelfLiftAvatarPikaLatentTailPin",
+        "SelfLiftAvatarPikaSeamColorAlign",
+        "SelfLiftAvatarPikaSeamFrameCover"
       ],
       "updated": "2026-11-24"
     }

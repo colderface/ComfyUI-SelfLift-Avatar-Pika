@@ -885,15 +885,15 @@ NODE_DISPLAY_NAME_MAPPINGS = {
 
 # Long-video support bundled with selflift-Avatar.
 NODE_CLASS_MAPPINGS.update({
-    "H3LatentGridSnap": H3LatentGridSnap,
-    "H3LatentTailPin": H3LatentTailPin,
-    "H3SeamColorAlign": H3SeamColorAlign,
-    "H3SeamFrameCover": H3SeamFrameCover,
+    "SelfLiftAvatarPikaLatentGridSnap": H3LatentGridSnap,
+    "SelfLiftAvatarPikaLatentTailPin": H3LatentTailPin,
+    "SelfLiftAvatarPikaSeamColorAlign": H3SeamColorAlign,
+    "SelfLiftAvatarPikaSeamFrameCover": H3SeamFrameCover,
 })
 
 NODE_DISPLAY_NAME_MAPPINGS.update({
-    "H3LatentGridSnap": "H3 Latent Grid Snap",
-    "H3LatentTailPin": "H3 Latent Tail Pin (Hard Overlap)",
-    "H3SeamColorAlign": "H3 Seam Color Align",
-    "H3SeamFrameCover": "H3 Seam Frame Cover",
+    "SelfLiftAvatarPikaLatentGridSnap": "H3 Latent Grid Snap",
+    "SelfLiftAvatarPikaLatentTailPin": "H3 Latent Tail Pin (Hard Overlap)",
+    "SelfLiftAvatarPikaSeamColorAlign": "H3 Seam Color Align",
+    "SelfLiftAvatarPikaSeamFrameCover": "H3 Seam Frame Cover",
 })
